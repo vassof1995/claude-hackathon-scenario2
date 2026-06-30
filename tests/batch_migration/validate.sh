@@ -51,21 +51,23 @@ expect_denied() { # role password "SQL" label
 }
 
 # --- Bring up the stand-in -----------------------------------------------------------------
-info "Bringing up the legacy stand-in (docker compose up --build -d)…"
-( cd "$LEGACY" && docker compose up --build -d ) || { echo "compose up failed (is the docker daemon running?)"; exit 2; }
-
-info "Waiting for postgres + web-api to be healthy (so app schema + seed exist)…"
-for i in $(seq 1 80); do
-  up="$(cd "$LEGACY" && docker compose ps 2>/dev/null)"
-  pg_ok=$(echo "$up"  | grep -E '\bpostgres\b' | grep -c healthy)
-  api_ok=$(echo "$up" | grep -E '\bweb-api\b'  | grep -c healthy)
-  [ "${pg_ok:-0}" -ge 1 ] && [ "${api_ok:-0}" -ge 1 ] && break
-  sleep 3
-done
+# --wait blocks until EVERY service is healthy (postgres, web-api AND batch). batch owns the
+# reporting schema via Flyway and exposes /run, so we must wait for it, not just web-api.
+info "Bringing up the legacy stand-in (docker compose up --build -d --wait)…"
+if ! ( cd "$LEGACY" && docker compose up --build -d --wait --wait-timeout 240 ); then
+  echo "stand-in did not become healthy — diagnostics:"
+  ( cd "$LEGACY" && docker compose ps && echo "--- logs ---" && docker compose logs --tail=60 )
+  exit 2
+fi
 
 # --- Trigger one reconciliation (the EventBridge run-to-exit stand-in) ----------------------
 info "Triggering reconciliation for $BIZDATE via POST /run…"
-curl -fsS -X POST "http://localhost:8082/run?date=$BIZDATE" >/dev/null && ok "POST /run accepted" || bad "POST /run failed"
+posted=""
+for _ in $(seq 1 10); do
+  if curl -fsS -X POST "http://localhost:8082/run?date=$BIZDATE" >/dev/null; then posted=1; break; fi
+  sleep 3
+done
+[ -n "$posted" ] && ok "POST /run accepted" || bad "POST /run failed after retries"
 
 # --- Assertion 1: one result row per active account ----------------------------------------
 info "Assertions"
