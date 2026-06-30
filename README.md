@@ -1,12 +1,15 @@
 # Team <name>
 
 ## Participants
-- Name (role(s) played today)
-- Name (role(s) played today)
-- Name (role(s) played today)
+- Polina Gubaidullina (role(s) played today)
+- Luise Dose (role(s) played today)
+- Phillip Nientiedt (role(s) played today)
+- Arnd Kleinbeck (role(s) played today)
+- Vasileios Sofroni (role(s) played today)
+- Alexander Sturm (role(s) played today)
 
 ## Scenario
-Scenario <#>: <title>
+Scenario <#>: Scenario 2. Cloud Migration
 
 ## What We Built
 A couple of paragraphs. What exists in this repo that didn't exist when you
