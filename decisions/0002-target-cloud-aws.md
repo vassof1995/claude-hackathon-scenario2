@@ -1,8 +1,8 @@
 # ADR-0002: Target cloud is AWS
 
 - **Status:** Accepted
-- **Date:** <TODO>
-- **Deciders:** Team <name>
+- **Date:** 2026-06-30
+- **Deciders:** Team The 4am Club
 
 ## Context
 We must pick one target cloud. The brief stubs three primitives locally — object storage,

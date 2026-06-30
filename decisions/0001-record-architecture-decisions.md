@@ -1,8 +1,8 @@
 # ADR-0001: Record architecture decisions
 
 - **Status:** Accepted
-- **Date:** <TODO>
-- **Deciders:** Team <name>
+- **Date:** 2026-06-30
+- **Deciders:** Team The 4am Club
 
 ## Context
 The CTO reads our ADRs. We need a lightweight, durable record of every meaningful

@@ -1,9 +1,12 @@
 # CLAUDE.md — Project Conventions (Scenario 2: Cloud Migration)
 
 This is the **project-level** guidance, shared by the whole team and committed to VCS.
-Per-workload specifics live in `web-app/CLAUDE.md`, `batch/CLAUDE.md`,
-`reporting-db/CLAUDE.md`, and `infra/CLAUDE.md`. Personal preferences belong in your
-own `~/.claude/CLAUDE.md`, not here.
+The repo has two halves (see **ADR-0005**): the runnable on-prem **source** system under
+`legacy/` (its guidance is `legacy/README.md`), and the **AWS target** stand-in at the root
+(`docker-compose.yml`, `infra/`). IaC guidance lives in `infra/CLAUDE.md`. Per-workload
+*target* `CLAUDE.md` files are added when each workload is actually migrated — not before, so
+we don't point at files that don't exist. Personal preferences belong in your own
+`~/.claude/CLAUDE.md`, not here.
 
 ## Mission
 Migrate Contoso Financial's three on-prem workloads to **AWS**, producing artifacts that
@@ -11,23 +14,28 @@ Migrate Contoso Financial's three on-prem workloads to **AWS**, producing artifa
 Design every artifact for three readers: the auditor (IaC), the CTO (ADRs), ops (runbook).
 
 ## The three workloads
-1. **web-app/** — customer-facing web application → containerized, fronted by ALB, runs on ECS/App Runner.
-2. **batch/** — nightly reconciliation job → scheduled task (EventBridge + ECS task / Batch).
-3. **reporting-db/** — reporting database five teams query directly → RDS Postgres + read replica.
+They live today under `legacy/` (Spring Boot + Vue + one Postgres); the arrow is the target shape.
+1. **web app** (`legacy/web-app/`) — Vue/nginx frontend + Spring Boot API → containerized, fronted by ALB, on ECS/App Runner.
+2. **batch** (`legacy/batch/`) — nightly Spring Boot reconciliation job → scheduled task (EventBridge + ECS task / Batch).
+3. **reporting DB** (`legacy/` Postgres `reporting` schema) — five teams query it directly → RDS Postgres + read replica.
 
 ## Local ↔ cloud mapping (name things accordingly)
-| Local (docker compose) | Stands in for | Name it like |
-|------------------------|---------------|--------------|
-| MinIO                  | Amazon S3     | `*-s3`, bucket names |
-| Postgres               | Amazon RDS    | `*-rds` |
-| Redis                  | ElastiCache   | `*-elasticache` |
+Only Postgres is a datastore actually migrated from the source. Redis and S3 are deliberate
+**target additions** (the legacy system has neither) — name and justify them as such (ADR-0005).
+| Target stand-in (docker compose) | Stands in for | In the source? |
+|----------------------------------|---------------|----------------|
+| `postgres-rds`                   | Amazon RDS        | yes — migrated |
+| `redis-elasticache`              | Amazon ElastiCache | no — target addition |
+| `minio-s3`                       | Amazon S3          | no — target addition |
 
 ## Conventions
 - **IaC = Terraform.** Idempotent, no hardcoded secrets, remote state (never check state in).
   Prefer **AWS Secrets Manager / SSM Parameter Store** for any secret — see ADR-0002.
-- **No plaintext secrets, ever.** A `PreToolUse` hook deterministically blocks edits that
-  write a plaintext secret into IaC. The hook is the hard guardrail; this prompt is the
-  soft preference. (Why one is a hook and one is a prompt: ADR-0003.)
+- **No plaintext secrets, ever.** The intent is a `PreToolUse` hook that deterministically
+  blocks edits writing a plaintext secret into IaC — the hard guardrail to this soft prompt
+  (why one is a hook and one a prompt: ADR-0003). **Status: specified, not yet implemented**
+  (see README "If We Had More Time"). The guardrails that *are* live today: a `PostToolUse`
+  ADR nudge and a `Stop` docs-currency check (ADR-0004) — both in `.claude/settings.json`.
 - **ADRs** for every meaningful call, in `/decisions`, numbered `NNNN-title.md`.
 - **Commit often, small, and descriptively.** The commit history is judged — it's the journey.
 - **Plan Mode** for anything reversible-dangerous (cutover steps, rollback). Direct execution

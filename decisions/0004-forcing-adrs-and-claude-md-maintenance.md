@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-30
-- **Deciders:** Team <name>
+- **Deciders:** Team The 4am Club
 
 ## Context
 ADR-0001 says we record every meaningful decision; the project `CLAUDE.md` says "ADRs for

@@ -1,8 +1,8 @@
 # ADR-0003: Secrets in IaC — a hook blocks, a prompt prefers
 
-- **Status:** Accepted
-- **Date:** <TODO>
-- **Deciders:** Team <name>
+- **Status:** Accepted (decision); **hook implementation pending**
+- **Date:** 2026-06-30
+- **Deciders:** Team The 4am Club
 
 ## Context
 Plaintext secrets in IaC are a hard "never." But "prefer the secret manager for X" is a soft
@@ -16,6 +16,11 @@ cert stresses knowing which is which.
   it doesn't.
 - A **prompt in `CLAUDE.md`** ("prefer AWS Secrets Manager / SSM for credentials") expresses
   the **preference** for how to do it right, where judgment is appropriate.
+
+> **Implementation status (2026-06-30):** the *decision* stands, but the `PreToolUse` hook is
+> **not yet built** — the live hooks today are the ADR nudge and docs-currency check (ADR-0004).
+> Until the secrets hook exists, the no-plaintext-secrets rule is enforced only by prompt. See
+> README "If We Had More Time". This ADR is the spec the hook must satisfy when written.
 
 ## Consequences
 - The dangerous, unambiguous failure mode is caught with 100% reliability, not "usually."

@@ -6,8 +6,9 @@ right.** The auditor reads this folder first.
 ## Non-negotiables
 - **Idempotent.** `plan` after `apply` shows no drift.
 - **No hardcoded secrets.** Ever. Use **AWS Secrets Manager / SSM Parameter Store** and pass
-  references, not values. A `PreToolUse` hook blocks any edit that writes a plaintext secret
-  here (see ADR-0003). If the hook fires, fix the approach — don't work around it.
+  references, not values. A `PreToolUse` hook to block plaintext secrets here is **specified
+  but not yet implemented** (see ADR-0003 and README "If We Had More Time"); until it exists,
+  this is a prompt-level rule — treat it as binding anyway.
 - **Remote state story** that isn't "check it in" — S3 backend + DynamoDB lock (describe it
   even though we don't stand it up live). State files are git-ignored.
 - **Tag everything** (owner, workload, env, cost-center). Missing tags is a known-bad pattern
@@ -15,7 +16,8 @@ right.** The auditor reads this folder first.
 - **Least privilege IAM.** No `*:*`. Over-permissive IAM and open security groups (`0.0.0.0/0`
   on sensitive ports) are known-bad patterns the eval harness flags.
 
-## Layout (suggested)
+## Layout (suggested — none built yet)
+No Terraform exists in this folder yet (Challenge 5, "The Foundation"). The intended shape:
 ```
 infra/
   modules/        # reusable: network, ecs, rds, elasticache, s3
