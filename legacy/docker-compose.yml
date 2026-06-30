@@ -1,0 +1,94 @@
+# Contoso Financial — the LEGACY on-prem system, as it ran before the cloud migration.
+# Self-contained: `docker compose up` brings up the whole on-prem stack.
+#
+#   postgres      single instance, schemas `app` + `reporting`  (-> later: Amazon RDS)
+#   web-api       Spring Boot REST API over the `app` schema
+#   web-frontend  Vue.js SPA served by nginx, proxies /api -> web-api
+#   batch         Spring Boot nightly reconciliation, writes `reporting`
+#
+# The five reporting teams connect straight to postgres:5432 as `report_reader`.
+# Secrets come from .env (copy from .env.example); nothing is hardcoded.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # consumed by the init script to create the least-privilege roles
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      BATCH_DB_PASSWORD: ${BATCH_DB_PASSWORD}
+      REPORT_DB_PASSWORD: ${REPORT_DB_PASSWORD}
+    ports:
+      - "5432:5432"   # exposed so the five reporting teams can query directly
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./reporting-db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  web-api:
+    build:
+      context: ./web-app/api
+    image: contoso/legacy-web-api:local
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: app_user
+      SPRING_DATASOURCE_PASSWORD: ${APP_DB_PASSWORD}
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+
+  web-frontend:
+    build:
+      context: ./web-app/frontend
+    image: contoso/legacy-web-frontend:local
+    ports:
+      - "8080:80"
+    depends_on:
+      web-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  batch:
+    build:
+      context: ./batch
+    image: contoso/legacy-batch:local
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: batch_user
+      SPRING_DATASOURCE_PASSWORD: ${BATCH_DB_PASSWORD}
+      # nightly at 02:00; override to test. Manual trigger: POST /run
+      RECON_CRON: "0 0 2 * * *"
+    ports:
+      - "8082:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      web-api:
+        condition: service_healthy   # ensures app tables + seed exist before first run
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  pgdata:
