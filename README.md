@@ -9,7 +9,17 @@
 - Alexander Sturm (role(s) played today)
 
 ## Scenario
-Scenario 2. Cloud Migration
+Scenario 2. Cloud Migration — *"The Lift, the Shift, and the 4am Call"*
+
+Contoso Financial runs three on-prem workloads — a customer-facing web app, a
+nightly batch reconciliation job, and a reporting database five teams query
+directly. The CFO signed the cloud contract; the CTO wants "cloud-native, not
+lift-and-shift"; compliance wants residency controls; SRE wants sleep. We pick
+the target cloud (**AWS**) and the migration pattern, then produce cloud-ready
+artifacts that **run locally with production-equivalent architecture** — no live
+deploy. Docker Compose maps each service to a cloud primitive (**MinIO → S3,
+Postgres → RDS, Redis → ElastiCache**). Everything is designed for three readers:
+the auditor reads the IaC, the CTO reads the ADRs, and ops runs the runbook at 4am.
 
 ## What We Built
 #1 We created the onPrem legacy app to have a starting point for the cloud migratin szenario
