@@ -12,8 +12,7 @@
 Scenario 2. Cloud Migration
 
 ## What We Built
-A couple of paragraphs. What exists in this repo that didn't exist when you
-started. What runs, what's scaffolding, what's faked.
+#1 We created the onPrem legacy app to have a starting point for the cloud migratin szenario
 
 ## Challenges Attempted
 | # | Challenge | Status | Notes |
