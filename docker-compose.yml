@@ -1,0 +1,64 @@
+# Local stand-in for the AWS target architecture.
+# Service names mirror their cloud primitives so the mapping is obvious to every reader.
+#   minio    -> Amazon S3
+#   postgres -> Amazon RDS (Postgres)
+#   redis    -> Amazon ElastiCache (Redis)
+# Secrets come from a local .env (git-ignored). In cloud these become Secrets Manager refs.
+
+services:
+  web-app:
+    # The customer-facing web app -> ECS / App Runner behind an ALB.
+    build:
+      context: ./web-app
+    image: contoso/web-app:local
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://contoso:${POSTGRES_PASSWORD}@postgres-rds:5432/contoso
+      REDIS_URL: redis://redis-elasticache:6379
+      S3_ENDPOINT: http://minio-s3:9000
+      S3_BUCKET: contoso-web-assets
+    depends_on:
+      - postgres-rds
+      - redis-elasticache
+      - minio-s3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+  postgres-rds:
+    # Stands in for Amazon RDS (Postgres).
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: contoso
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: contoso
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis-elasticache:
+    # Stands in for Amazon ElastiCache (Redis).
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  minio-s3:
+    # Stands in for Amazon S3.
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # console
+    volumes:
+      - miniodata:/data
+
+volumes:
+  pgdata:
+  miniodata:

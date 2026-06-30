@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scenario 2 — Cloud Migration · Team TODO</title>
+  <style>
+    :root {
+      --bg: #0b1220; --fg: #e6edf3; --accent: #4f9cf9; --muted: #8b98a9; --card: #131c2e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg); color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+    .deck { height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .slide {
+      display: none; width: min(960px, 92vw); padding: 4rem;
+      background: var(--card); border-radius: 16px; border: 1px solid #22304a;
+    }
+    .slide.active { display: block; }
+    h1 { font-size: 2.6rem; line-height: 1.1; margin-bottom: 1rem; }
+    h2 { font-size: 1.8rem; color: var(--accent); margin-bottom: 1.5rem; }
+    p, li { font-size: 1.15rem; color: var(--muted); line-height: 1.6; }
+    ul { margin-left: 1.4rem; margin-top: .5rem; }
+    .tag { display:inline-block; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase;
+           color:var(--accent); border:1px solid var(--accent); border-radius:999px;
+           padding:.25rem .75rem; margin-bottom:1.5rem; }
+    .nav { position: fixed; bottom: 1.5rem; right: 2rem; color: var(--muted); font-size:.9rem; }
+    .nav button { background:none; border:1px solid #22304a; color:var(--fg);
+                  border-radius:8px; padding:.4rem .8rem; cursor:pointer; margin-left:.4rem; }
+  </style>
+</head>
+<body>
+  <div class="deck">
+    <section class="slide active">
+      <span class="tag">Scenario 2 · Cloud Migration</span>
+      <h1>The Lift, the Shift, and the 4am Call</h1>
+      <p>Team &lt;name&gt; · Contoso Financial → AWS</p>
+      <p style="margin-top:1rem">Cloud-ready, runs locally. MinIO→S3 · Postgres→RDS · Redis→ElastiCache.</p>
+    </section>
+
+    <section class="slide">
+      <h2>The Problem</h2>
+      <ul>
+        <li>Three on-prem workloads: web app, nightly batch, reporting DB (5 direct consumers).</li>
+        <li>CFO signed the contract. CTO wants cloud-native. Compliance wants residency. SRE wants sleep.</li>
+        <li>They are not aligned. <strong>TODO: the tension you resolved.</strong></li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h2>What We Built</h2>
+      <ul>
+        <li>TODO — the running compose stack mapped to AWS primitives.</li>
+        <li>TODO — IaC that reads right + the secrets-blocking hook.</li>
+        <li>TODO — validation suite that catches the undocumented couplings.</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h2>The Decision</h2>
+      <p>TODO — lift-and-shift-then-optimize vs. refactor-on-the-way-in, and why. Risks accepted, who bears them.</p>
+    </section>
+
+    <section class="slide">
+      <h2>How We Used Claude Code</h2>
+      <ul>
+        <li>Per-workload <code>CLAUDE.md</code> — right guidance per folder.</li>
+        <li>PreToolUse hook (deterministic) vs. prompt preference (probabilistic).</li>
+        <li>TODO — subagent discovery, eval harness, the moment Claude surprised you.</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="nav">
+    <span id="counter">1 / 5</span>
+    <button onclick="move(-1)">‹ Prev</button>
+    <button onclick="move(1)">Next ›</button>
+  </div>
+
+  <script>
+    let i = 0;
+    const slides = document.querySelectorAll('.slide');
+    const counter = document.getElementById('counter');
+    function move(d) {
+      slides[i].classList.remove('active');
+      i = (i + d + slides.length) % slides.length;
+      slides[i].classList.add('active');
+      counter.textContent = (i + 1) + ' / ' + slides.length;
+    }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') move(1);
+      if (e.key === 'ArrowLeft') move(-1);
+    });
+  </script>
+</body>
+</html>
