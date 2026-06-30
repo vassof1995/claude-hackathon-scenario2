@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Scenario 2 — Cloud Migration · Team TODO</title>
+  <title>The Lift, the Shift, and the 4am Call · The 4am Club</title>
   <style>
     :root {
       --bg: #0b1220; --fg: #e6edf3; --accent: #4f9cf9; --muted: #8b98a9; --card: #131c2e;
@@ -38,47 +38,73 @@
     <section class="slide active">
       <span class="tag">Scenario 2 · Cloud Migration</span>
       <h1>The Lift, the Shift, and the 4am Call</h1>
-      <p>Team &lt;name&gt; · Contoso Financial → AWS</p>
-      <p style="margin-top:1rem">Cloud-ready, runs locally. MinIO→S3 · Postgres→RDS · Redis→ElastiCache.</p>
+      <!-- NOTE: We migrated Contoso Financial's three on-prem workloads to AWS, producing artifacts that run locally with production-equivalent architecture and are designed for three readers. -->
+      <p>Team The 4am Club · Contoso Financial &rarr; AWS</p>
+      <p style="margin-top:1rem">Cloud-ready, runs locally: MinIO&rarr;S3 · Postgres&rarr;RDS · Redis&rarr;ElastiCache.</p>
+      <p style="margin-top:1rem">Built for three readers: the auditor reads the IaC, the CTO reads the ADRs, ops runs the runbook.</p>
     </section>
 
     <section class="slide">
-      <h2>The Problem</h2>
+      <h2>The Problem and the Tension</h2>
+      <!-- NOTE: Four stakeholders pulling in four directions, and the legacy code has couplings nobody wrote down. Our job was to satisfy all of them without breaking the things the docs don't mention. -->
       <ul>
-        <li>Three on-prem workloads: web app, nightly batch, reporting DB (5 direct consumers).</li>
-        <li>CFO signed the contract. CTO wants cloud-native. Compliance wants residency. SRE wants sleep.</li>
-        <li>They are not aligned. <strong>TODO: the tension you resolved.</strong></li>
+        <li>Three workloads: customer web app, nightly batch reconciliation, a reporting DB five teams query directly.</li>
+        <li>CFO signed the contract; CTO wants cloud-native, not lift-and-shift; compliance wants residency; SRE wants sleep.</li>
+        <li>Stakeholders are not aligned &mdash; and the docs hide the real coupling.</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h2>The Decision: One 6-R Does Not Fit All Three</h2>
+      <!-- NOTE: The honest answer to cloud-native versus lift-and-shift is per-workload. We go cloud-native exactly where the workload invites it and re-host the API where refactoring adds risk without payback. -->
+      <ul>
+        <li>Frontend: re-platform &mdash; built Vue SPA to S3 + CloudFront.</li>
+        <li>API: re-host &mdash; same Spring Boot image on ECS Fargate behind an ALB.</li>
+        <li>Batch: re-architect the trigger only &mdash; EventBridge Scheduler to a run-to-exit ECS task.</li>
+        <li>Reporting DB: re-platform &mdash; RDS Postgres (Multi-AZ) + read replica.</li>
+        <li>Cloud-native where it pays; risky refactors (caching, DB split) explicitly deferred.</li>
       </ul>
     </section>
 
     <section class="slide">
       <h2>What We Built</h2>
+      <!-- NOTE: Everything runs locally but reads as production architecture. The IaC must read right even though we never apply to a live account, and the secrets hook is a hard guardrail, not a hope. -->
       <ul>
-        <li>TODO — the running compose stack mapped to AWS primitives.</li>
-        <li>TODO — IaC that reads right + the secrets-blocking hook.</li>
-        <li>TODO — validation suite that catches the undocumented couplings.</li>
+        <li>A compose stack mapped one-to-one to AWS primitives: MinIO to S3, Postgres to RDS, Redis to ElastiCache, containers to ECS behind an ALB.</li>
+        <li>Terraform IaC: one VPC three tiers, secrets as Secrets Manager references, never values.</li>
+        <li>A deterministic PreToolUse hook that blocks any plaintext secret in IaC.</li>
+        <li>A validation suite that asserts the migration, not just smoke tests.</li>
       </ul>
     </section>
 
     <section class="slide">
-      <h2>The Decision</h2>
-      <p>TODO — lift-and-shift-then-optimize vs. refactor-on-the-way-in, and why. Risks accepted, who bears them.</p>
+      <h2>The Gremlins: Couplings C1 to C5</h2>
+      <!-- NOTE: These are the undocumented couplings Discovery surfaced. Each is designed out above, and the starred ones - the grant matrix, the empty-schema test, the read-only negative test - are asserted by the suite so it isn't theatre. -->
+      <ul>
+        <li>C1 nginx /api proxy &rarr; CloudFront /api/* behavior to the ALB; same-origin, no CORS.</li>
+        <li>C2 one shared Postgres, batch reads app schema &rarr; keep a single RDS, two schemas, three roles.</li>
+        <li>C3 batch needs app tables first &rarr; cutover order + fail-fast and EventBridge retry.</li>
+        <li>C4 five teams connect directly &rarr; point them at the read replica, SG-scoped to analyst CIDR.</li>
+        <li>C5 24/7 daemon just to fire a 2am cron &rarr; schedule moves to EventBridge, task runs and exits.</li>
+      </ul>
     </section>
 
     <section class="slide">
       <h2>How We Used Claude Code</h2>
+      <!-- NOTE: We split deterministic guardrails from probabilistic preferences: the hook blocks plaintext secrets with 100 percent reliability while the prompt expresses how to do it right, and every meaningful call landed in an ADR. -->
       <ul>
-        <li>Per-workload <code>CLAUDE.md</code> — right guidance per folder.</li>
-        <li>PreToolUse hook (deterministic) vs. prompt preference (probabilistic).</li>
-        <li>TODO — subagent discovery, eval harness, the moment Claude surprised you.</li>
+        <li>Per-workload <code>CLAUDE.md</code> &mdash; the right guidance per folder.</li>
+        <li>Deterministic PreToolUse hook vs. probabilistic prompt preference (ADR-0003).</li>
+        <li>An ADR for every meaningful call, numbered in <code>/decisions</code>.</li>
+        <li>Cutover order and rollback designed in Plan Mode for the 4am call.</li>
       </ul>
     </section>
   </div>
 
   <div class="nav">
-    <span id="counter">1 / 5</span>
-    <button onclick="move(-1)">‹ Prev</button>
-    <button onclick="move(1)">Next ›</button>
+    <span id="counter">1 / 6</span>
+    <button onclick="move(-1)">&lsaquo; Prev</button>
+    <button onclick="move(1)">Next &rsaquo;</button>
   </div>
 
   <script>
