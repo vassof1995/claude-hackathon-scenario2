@@ -22,14 +22,14 @@ Postgres → RDS, Redis → ElastiCache**). Everything is designed for three rea
 the auditor reads the IaC, the CTO reads the ADRs, and ops runs the runbook at 4am.
 
 ## What We Built
-Three things exist today:
+Four things exist today:
 
 1. **The on-prem source system** (`legacy/`) — the production-equivalent baseline we migrate
    *from*, and it actually runs: a Vue/nginx frontend → Spring Boot API → one Postgres (schemas
    `app` + `reporting`) → a Spring Boot nightly reconciliation batch. Three least-privilege DB
    roles; the five reporting teams connect as a read-only `report_reader`. End-to-end with
    `cd legacy && docker compose up`.
-2. **The first migrated workload — batch** (`infra/modules/batch/`, ADR-0006) — a complete
+2. **The batch workload, migrated** (`infra/modules/batch/`, ADR-0006) — a complete
    vertical slice for the nightly reconciliation: Terraform (EventBridge Scheduler → `ecs:RunTask`
    run-to-exit Fargate task, least-privilege IAM, Secrets Manager references, tags, declared
    remote state), an ops **runbook** (`docs/runbook-batch.md`), **The Proof**
@@ -38,36 +38,45 @@ Three things exist today:
    infrastructure (24h/day daemon → minutes/day task) per the migration plan
    (`docs/03-migration-plan.md` §3). The Terraform *reads right* but is not applied (scenario
    rule); The Proof runs against the local stand-in.
-3. **The Claude Code governance layer** — configuration that makes the tool enforce our
+3. **The reporting-db workload, migrated** (`infra/terraform/reporting-db.tf`, ADR-0007) — RDS
+   Multi-AZ primary + **read replica**: writers (web-api, batch) hit the primary, the five
+   reporting teams' read load is isolated on the replica as `report_reader`. Private-only
+   (no public access), security-group scoped to the app tier + an approved analyst CIDR (never
+   `0.0.0.0/0`), KMS at rest + TLS in transit, role passwords from Secrets Manager. The three
+   roles and cross-schema grants are preserved verbatim. Ships with a 7-step cutover/rollback
+   **runbook** (`docs/runbooks/reporting-db-cutover.md`) and **The Proof**
+   (`tests/reporting-db/` — authz boundaries + data integrity) per plan §4.
+4. **The Claude Code governance layer** — configuration that makes the tool enforce our
    conventions instead of just suggesting them:
    - **ADR-forcing:** a `commit-msg` git hook rejects architectural commits that don't reference
      an ADR; a `PostToolUse` hook nudges in-session; the `/adr` skill scaffolds the next ADR.
    - **Docs currency:** a `Stop` hook keeps the read-first docs (CLAUDE.md + README) honest;
      `/review-docs` is the on-demand companion.
-   - **Six ADRs** capturing the calls, incl. the hook-vs-prompt principle (ADR-0003), the
-     source/target repo split (ADR-0005), and the batch trigger re-architecture (ADR-0006).
+   - **Seven ADRs** capturing the calls, incl. the hook-vs-prompt principle (ADR-0003), the
+     source/target repo split (ADR-0005), the batch trigger re-architecture (ADR-0006), and the
+     reporting-db read-replica decision (ADR-0007).
 
-The other three workloads (web-api, frontend, reporting-db) are planned in
-`docs/03-migration-plan.md` but their Terraform/containers are **not built yet**. The **AWS
-target stand-in** at the repo root (`docker-compose.yml`) brings up the target datastores
-(RDS/ElastiCache/S3 via Postgres/Redis/MinIO). The split — `legacy/` is the source, the root is
-the target — is deliberate and documented in **ADR-0005**.
+Two of three workloads are now migrated (batch, reporting-db); the **web-app** (frontend + API)
+is planned in `docs/03-migration-plan.md` but its Terraform/containers are **not built yet**.
+The **AWS target stand-in** at the repo root (`docker-compose.yml`) brings up the target
+datastores (RDS/ElastiCache/S3 via Postgres/Redis/MinIO). The split — `legacy/` is the source,
+the root is the target — is deliberate and documented in **ADR-0005**.
 
 ## Challenges Attempted
-The standout work is the **batch workload migrated end-to-end** (IaC + runbook + tests + CI),
-plus cross-cutting Claude Code config (stresses the cert domains) and a per-workload migration
-plan grounded in the real `legacy/` code.
+The standout work is **two workloads migrated end-to-end** (batch + reporting-db: IaC + runbook +
+tests), plus cross-cutting Claude Code config (stresses the cert domains) and a per-workload
+migration plan grounded in the real `legacy/` code.
 
 | # | Challenge | Status | Notes |
 |---|---|---|---|
 | 1 | The Memo | scaffold | `docs/01-memo.md` template; lift-vs-refactor not yet argued (a CFO/Legal stance — left for the team). |
-| 2 | The Discovery | **done** | `docs/02-discovery.md`, read off the real `legacy/` code: 8 couplings incl. five teams on the `reporting` schema, batch's cross-schema read, bootstrap ordering. |
-| 3 | The Options | **partial** | Per-workload migration plan with 6-R pattern choices (`docs/03-migration-plan.md`); target cloud + mapping recorded (ADR-0002 AWS, ADR-0005 layout, ADR-0006 batch). Candidate architectures not formally scored. |
+| 2 | The Discovery | **done** | `docs/02-discovery.md` (whole system) + `docs/discovery-reporting-db.md` (deep-dive), read off the real `legacy/` code: 8 couplings incl. five teams on the `reporting` schema, batch's cross-schema read, bootstrap ordering. |
+| 3 | The Options | **partial** | Per-workload migration plan with 6-R pattern choices (`docs/03-migration-plan.md`); decisions recorded (ADR-0002 AWS, ADR-0005 layout, ADR-0006 batch, ADR-0007 reporting-db). Candidate architectures not formally scored. |
 | 4 | The Container | not started | The *migrated* web-app container isn't built (root compose has a documented placeholder). |
-| 5 | The Foundation | **partial** | First real Terraform landed: the **batch module + prod env** (`infra/`, ADR-0006) — least-priv IAM, Secrets Manager refs, tags, declared remote state. Other workloads' IaC and the secrets `PreToolUse` hook (ADR-0003) not yet built. |
-| 6 | The Proof | **partial** | `tests/batch_migration/` runs: idempotency + grant-matrix negative tests (Discovery ★ assertions), wired into CI. Other workloads' assertions pending. |
+| 5 | The Foundation | **partial** | Terraform for **two workloads**: batch module + prod env (`infra/modules/batch/`, ADR-0006) and reporting-db RDS + read replica (`infra/terraform/reporting-db.tf`, ADR-0007) — least-priv IAM, Secrets Manager refs, private-only, tags, declared remote state. web-app IaC and the secrets `PreToolUse` hook (ADR-0003) not yet built. |
+| 6 | The Proof | **partial** | `tests/batch_migration/` (idempotency + grant matrix) and `tests/reporting-db/` (authz boundaries + data integrity) — the Discovery ★ assertions. Batch is wired into CI. web-app assertions pending. |
 | 7 | The Scorecard | not started | |
-| 8 | The Undo | **partial** | `docs/runbook-batch.md` — exact batch cutover + rollback sequence and a 4am failure-mode table. Other workloads' runbooks pending. |
+| 8 | The Undo | **partial** | Cutover + rollback runbooks for batch (`docs/runbook-batch.md`) and reporting-db (`docs/runbooks/reporting-db-cutover.md`), with 4am failure-mode tables. web-app runbook pending. |
 | 9 | The Survey | not started | |
 
 ## Key Decisions
@@ -77,6 +86,7 @@ Full reasoning in `/decisions`:
 - **[ADR-0004](decisions/0004-forcing-adrs-and-claude-md-maintenance.md)** — **Force the *presence* of ADRs and *currency* of docs by gate; leave *quality* to prompt + review.**
 - **[ADR-0005](decisions/0005-repo-layout-legacy-source-vs-target-standin.md)** — **`legacy/` is the migration source; the root is the AWS target stand-in.** Only Postgres is migrated; Redis/S3 are target additions.
 - **[ADR-0006](decisions/0006-batch-trigger-rearchitecture.md)** — **Batch: re-architect the trigger, not the logic.** EventBridge Scheduler → run-to-exit ECS task (24h/day daemon → minutes/day; schedule moves from code into ops-visible infra).
+- **[ADR-0007](decisions/0007-reporting-db-read-replica.md)** — **Reporting DB: RDS Multi-AZ + read replica.** Five teams' read load isolated on the replica; one instance keeps both schemas so batch's cross-schema grant survives; schema split deferred.
 
 ## How to Run It
 Assumes Docker (and Python 3 for the governance hooks). Two stacks:
@@ -100,10 +110,13 @@ docker compose up -d postgres-rds redis-elasticache minio-s3
 ```
 
 ```bash
-# C) The batch migration Proof — runs the ★ assertions against the stand-in.
-tests/batch_migration/validate.sh --down   # bring up legacy stack, assert, tear down
-#   checks: one result row per account · seeded id%7 discrepancies · idempotent re-run
-#           · grant matrix (report_reader denied on app/writes; batch_user denied writing app)
+# C) The migration Proofs — run the ★ assertions against the stand-in.
+tests/batch_migration/validate.sh --down    # batch: one row/account · seeded id%7 discrepancies
+                                             #        · idempotent re-run · grant matrix
+tests/reporting-db/authz_boundaries.sh       # reporting-db: report_reader SELECT-only on reporting,
+                                             #        denied on app + writes; batch cross-schema read
+tests/reporting-db/data_integrity.sh         # reporting-db: app schema identical source↔dest
+                                             #        (row counts, checksums, no dup business keys)
 ```
 
 ```bash
@@ -118,13 +131,14 @@ git restore --staged infra/demo.tf && rm infra/demo.tf
 In priority order, honest about what's held together with tape:
 1. **The secrets `PreToolUse` hook (ADR-0003)** — specified and described in our docs, but
    **not yet implemented**. Highest-value gap.
-2. **The other workloads' Terraform (Challenge 5)** — batch is done; web-api, frontend, and
-   reporting-db need the same module treatment (plan §2/§4), incl. the shared network/RDS modules.
+2. **The web-app Terraform (Challenge 5)** — batch and reporting-db are done; the web-app
+   (frontend → S3/CloudFront, API → ECS/ALB, plan §2) needs the same treatment, plus the shared
+   network module. Also unify the two IaC layouts (`infra/modules/` vs `infra/terraform/`).
 3. **The Container (Challenge 4)** — containerize the migrated web app and wire it into the root
    compose (`build: ./web-app`), plus the batch cloud-profile run-once image (ADR-0006), so the
    target stack runs end-to-end too.
-4. **The Proof for the rest (Challenge 6)** — batch is asserted; add the reporting contract,
-   web-api integrity, and the C3 empty-schema fail-fast test the batch suite still stubs out.
+4. **The Proof for web-app (Challenge 6)** — batch and reporting-db are asserted; add the
+   web-api integrity checks and the C3 empty-schema fail-fast test the batch suite still stubs out.
 5. **The Memo (Challenge 1)** — argue lift-and-shift vs refactor for Legal/CFO.
 6. **Scorecard (7), Undo for the rest (8), Survey (9)** — the quality + agentic stretch (batch
    already has its runbook).
