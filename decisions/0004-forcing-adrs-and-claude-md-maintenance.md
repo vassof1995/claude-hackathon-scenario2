@@ -35,18 +35,24 @@ their **quality** to prompts and review. Concretely, an escalation ladder:
 3. **The easy path:** the `/adr` skill scaffolds the next-numbered ADR and pre-fills it
    from the diff, so satisfying the gate costs seconds, not friction.
 
-For **CLAUDE.md maintenance** we keep every file hand-written and let a hook keep it honest —
-we do **not** generate or auto-create CLAUDE.md content:
-- A **`Stop` hook** (`scripts/claude_md_currency.py`) checks, when a turn ends, whether code
-  under a directory-scoped CLAUDE.md changed in the working tree without that CLAUDE.md being
-  revised. If so, it asks Claude to review the existing file and revise it where the guidance
-  is now stale — or to confirm explicitly that no change is needed. It fires at most once per
+For **read-first doc maintenance** (CLAUDE.md *and* README.md) we keep every file
+hand-written and let one hook keep it honest — we do **not** generate or auto-create content:
+- A **`Stop` hook** (`scripts/docs_currency.py`) checks, when a turn ends, for two kinds of
+  drift in the working tree:
+  - **CLAUDE.md** — code under a directory-scoped CLAUDE.md changed without that file being
+    revised.
+  - **README.md** — a story-relevant change landed (a new ADR, a how-to-run change in
+    compose/Dockerfile/scripts, a new skill or hook) without README.md being touched. README
+    is the file the judges read first, so it must keep telling the true story.
+  If either fires, it asks Claude to review the existing doc and revise it where it is now
+  stale — or to confirm explicitly that no change is needed. It fires at most once per
   session and never edits the file itself; the revision is Claude's judgment, not a template.
-- The **revision is always judgment-based.** A machine can detect *that* guidance may be
-  stale (deterministic: code touched, doc untouched); it cannot write *correct* guidance.
-  So the check is mechanical and the rewrite stays with the model + review.
-- The **root CLAUDE.md is exempt** from this check: it holds team conventions, not code-tracked
-  facts, so directory churn should not force a rewrite of it.
+- The **revision is always judgment-based.** A machine can detect *that* a doc may be stale
+  (deterministic: code/story touched, doc untouched); it cannot write *correct* prose. So the
+  check is mechanical and the rewrite stays with the model + review.
+- The **root CLAUDE.md is exempt** from the code-scope check: it holds team conventions, not
+  code-tracked facts, so directory churn should not force a rewrite of it. (README is checked
+  by story-relevant triggers instead, not by raw churn.)
 
 ## Consequences
 - Architectural changes cannot land silently undocumented; the decision trail the CTO reads
@@ -56,9 +62,12 @@ we do **not** generate or auto-create CLAUDE.md content:
 - `core.hooksPath` is local config, so each clone runs `scripts/setup.sh` once. The Claude
   hooks (`PostToolUse` ADR nudge, `Stop` CLAUDE.md currency) need no setup — they ship in
   committed `.claude/settings.json`.
-- CLAUDE.md never drifts silently: a code change under a scoped file forces a conscious
-  review. But because nothing is generated, the file stays fully human-authored — the check
-  prompts a person/model, it does not write guidance.
+- The read-first docs never drift silently: a code change under a scoped CLAUDE.md, or a
+  story-relevant change without a README touch, forces a conscious review. But because nothing
+  is generated, the docs stay fully human-authored — the check prompts a person/model, it does
+  not write the prose.
+- README currency is trigger-based, not churn-based, so it stays a signal not a nag: a typo
+  fix won't ask you to rewrite the story, but a new ADR or a how-to-run change will.
 - This same pattern (gate presence, prompt quality) generalises to the Scorecard
   (Challenge 7), which scores how often Claude proposes something a gate would block.
 

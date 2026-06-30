@@ -16,11 +16,11 @@
     ],
     "Stop": [
       {
-        "//": "CLAUDE.md currency: if code changed under a scoped CLAUDE.md but the file wasn't revised, drive a review. Once per session. See ADR-0004.",
+        "//": "Docs currency: if code changed under a scoped CLAUDE.md, or a story-relevant change landed without touching README.md, drive a review. Once per session. See ADR-0004.",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/claude_md_currency.py\""
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/docs_currency.py\""
           }
         ]
       }
