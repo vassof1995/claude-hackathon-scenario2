@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "//": "Committed, team-shared Claude Code config. Personal prefs go in settings.local.json.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "//": "ADR guard (soft): nudge when an architectural file is edited without ADR work. See ADR-0004.",
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/adr_guard.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

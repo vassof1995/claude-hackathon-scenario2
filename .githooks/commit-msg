@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# ADR gate — the HARD layer (deterministic, runs with or without Claude).
+#
+# If a commit touches an architectural surface (infra/, docker-compose, Dockerfile, *.tf),
+# the commit message MUST either:
+#   - reference an ADR:   ADR-0007   (the decision this change implements), or
+#   - explicitly opt out: [no-adr: <reason>]   (a conscious, recorded escape).
+# Staging a new decisions/NNNN-*.md in the same commit also satisfies the gate.
+#
+# This enforces PRESENCE of a recorded decision, never QUALITY — quality stays with review
+# and the CLAUDE.md prompt. See ADR-0004 for the hook-vs-prompt reasoning.
+# Bypass for genuine emergencies: `git commit --no-verify` (leaves a visible trail).
+set -euo pipefail
+
+msg_file="$1"
+msg="$(cat "$msg_file")"
+
+arch_re='^(infra/|docker-compose\.ya?ml$|.*Dockerfile$|.*\.tf$)'
+staged="$(git diff --cached --name-only)"
+
+touches_arch="$(echo "$staged" | grep -E "$arch_re" || true)"
+[ -z "$touches_arch" ] && exit 0   # nothing architectural — nothing to enforce
+
+adds_adr="$(echo "$staged" | grep -E '^decisions/[0-9]{4}-.*\.md$' || true)"
+refs_adr="$(echo "$msg" | grep -Eo 'ADR-[0-9]{4}' || true)"
+opts_out="$(echo "$msg" | grep -Eo '\[no-adr:[^]]+\]' || true)"
+
+if [ -n "$adds_adr" ] || [ -n "$refs_adr" ] || [ -n "$opts_out" ]; then
+  exit 0
+fi
+
+cat >&2 <<'EOF'
+✗ ADR gate: this commit changes architectural files but the message neither
+  references an ADR nor opts out.
+
+  Architectural files in this commit:
+EOF
+echo "$touches_arch" | sed 's/^/    - /' >&2
+cat >&2 <<'EOF'
+
+  Fix one of:
+    1. Reference the decision this implements:   add  "ADR-0007"  to the message.
+    2. Record a new decision:                    run  /adr <title>  and stage it.
+    3. Conscious exception:                      add  "[no-adr: <reason>]"  to the message.
+
+  (Emergency bypass, leaves a trail: git commit --no-verify)
+EOF
+exit 1
