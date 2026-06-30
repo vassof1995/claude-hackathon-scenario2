@@ -1,4 +1,4 @@
-# Team <name>
+# Team: The 4am Club
 
 ## Participants
 - Polina Gubaidullina (role(s) played today)
@@ -9,7 +9,7 @@
 - Alexander Sturm (role(s) played today)
 
 ## Scenario
-Scenario <#>: Scenario 2. Cloud Migration
+Scenario 2. Cloud Migration
 
 ## What We Built
 A couple of paragraphs. What exists in this repo that didn't exist when you
