@@ -1,0 +1,56 @@
+name: batch-migration
+
+# Automated validation of the batch migration (ADR-0006). Runs the same checks a developer
+# runs locally: the target IaC must read right, the validation script must be clean, and the
+# batch Proof must pass against the local stand-in.
+on:
+  push:
+    branches: [feature/batch-migration, main]
+    paths:
+      - "infra/**"
+      - "tests/batch_migration/**"
+      - "legacy/**"
+      - ".github/workflows/batch-migration.yml"
+  pull_request:
+    paths:
+      - "infra/**"
+      - "tests/batch_migration/**"
+      - "legacy/**"
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    name: Terraform fmt + validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+      - name: fmt
+        run: terraform -chdir=infra fmt -check -recursive
+      - name: init (no backend) + validate
+        run: |
+          cd infra/envs/prod
+          terraform init -backend=false -no-color
+          terraform validate -no-color
+
+  lint:
+    name: Shellcheck validation script
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          shellcheck -S warning tests/batch_migration/validate.sh
+
+  batch-proof:
+    name: Batch Proof (stand-in)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Run batch migration validation against the local stand-in
+        run: tests/batch_migration/validate.sh --down
