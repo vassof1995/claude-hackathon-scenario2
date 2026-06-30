@@ -4,6 +4,19 @@ variable "region" {
   default     = "eu-central-1"
 }
 
+# Used by the web-app slice (web-app.tf) — matches the module interface.
+variable "aws_region" {
+  description = "AWS region alias used by the web-app modules."
+  type        = string
+  default     = "eu-central-1"
+}
+
+variable "environment" {
+  description = "Environment name (prod, staging) — used as tag value and resource name suffix."
+  type        = string
+  default     = "prod"
+}
+
 variable "name_prefix" {
   description = "Resource name prefix."
   type        = string

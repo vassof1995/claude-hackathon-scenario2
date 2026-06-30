@@ -14,29 +14,41 @@
 # cloud these become AWS Secrets Manager / SSM references (ADR-0003).
 
 services:
-  # --- Migrated application containers -------------------------------------------------
-  # The customer-facing web app -> ECS / App Runner behind an ALB. It is NOT containerised
-  # for the target yet (that is Challenge 4, "The Container"). Until then this is a documented
-  # placeholder rather than a build pointing at a path that does not exist. When built, the
-  # same image must deploy to the target with a config swap, not a rebuild.
-  #
-  # web-app:
-  #   build:
-  #     context: ./web-app          # produced by Challenge 4; see legacy/web-app for the source
-  #   image: contoso/web-app:local
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     DATABASE_URL: postgres://contoso:${POSTGRES_PASSWORD}@postgres-rds:5432/contoso
-  #     REDIS_URL: redis://redis-elasticache:6379
-  #     S3_ENDPOINT: http://minio-s3:9000
-  #     S3_BUCKET: contoso-web-assets
-  #   depends_on: [postgres-rds, redis-elasticache, minio-s3]
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-  #     interval: 15s
-  #     timeout: 3s
-  #     retries: 5
+  # --- Migrated application containers (Challenge 4 + 5) -------------------------------
+  web-api:
+    # Spring Boot API — stands in for ECS Fargate task behind ALB.
+    # Cloud: ECR image → ECS Fargate service, secrets via Secrets Manager.
+    build:
+      context: ./legacy/web-app/api
+    image: contoso/legacy-web-api:local
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-rds:5432/contoso
+      SPRING_DATASOURCE_USERNAME: app_user
+      SPRING_DATASOURCE_PASSWORD: ${APP_DB_PASSWORD}
+    depends_on:
+      postgres-rds:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+
+  web-frontend:
+    # Vue SPA served by nginx — LOCAL ONLY.
+    # Cloud: dist/ uploaded to S3 contoso-web-frontend-s3, served via CloudFront.
+    # The nginx /api/ reverse-proxy here stands in for CloudFront /api/* → ALB (coupling C1).
+    build:
+      context: ./legacy/web-app/frontend
+    image: contoso/legacy-web-frontend:local
+    ports:
+      - "8080:80"
+    depends_on:
+      web-api:
+        condition: service_healthy
 
   # --- Target datastores (runnable today) ----------------------------------------------
   postgres-rds:
@@ -50,6 +62,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "contoso", "-d", "contoso"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis-elasticache:
     # Stands in for Amazon ElastiCache (Redis). Target addition — not present in legacy.
