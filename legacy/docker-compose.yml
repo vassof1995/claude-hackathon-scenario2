@@ -11,7 +11,9 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    build:
+      context: ./reporting-db
+    image: contoso/legacy-postgres:local
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -24,7 +26,6 @@ services:
       - "5432:5432"   # exposed so the five reporting teams can query directly
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./reporting-db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
