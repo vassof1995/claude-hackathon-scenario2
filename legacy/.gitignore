@@ -1,0 +1,7 @@
+# Local secrets — never commit
+.env
+
+# Build artifacts
+**/target/
+**/node_modules/
+**/dist/
