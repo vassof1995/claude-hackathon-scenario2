@@ -62,8 +62,10 @@ def main() -> int:
     if not file_path or not ARCH_PATTERN.search(file_path):
         return 0
 
-    # Don't nudge about edits to the ADRs themselves.
-    if re.search(r"decisions/\d{4}-.*\.md$", file_path):
+    # Docs (CLAUDE.md, ADRs, READMEs) are never the architectural change itself — they
+    # describe it. Editing infra/CLAUDE.md must not demand an ADR. Terraform/compose/
+    # Dockerfile are never .md, so excluding markdown loses no real trigger.
+    if file_path.endswith(".md"):
         return 0
 
     if adr_in_working_tree():

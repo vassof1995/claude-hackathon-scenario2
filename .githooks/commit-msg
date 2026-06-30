@@ -18,7 +18,8 @@ msg="$(cat "$msg_file")"
 arch_re='^(infra/|docker-compose\.ya?ml$|.*Dockerfile$|.*\.tf$)'
 staged="$(git diff --cached --name-only)"
 
-touches_arch="$(echo "$staged" | grep -E "$arch_re" || true)"
+# Docs describe architecture, they aren't the change — exclude *.md (CLAUDE.md, ADRs, READMEs).
+touches_arch="$(echo "$staged" | grep -E "$arch_re" | grep -vE '\.md$' || true)"
 [ -z "$touches_arch" ] && exit 0   # nothing architectural — nothing to enforce
 
 adds_adr="$(echo "$staged" | grep -E '^decisions/[0-9]{4}-.*\.md$' || true)"

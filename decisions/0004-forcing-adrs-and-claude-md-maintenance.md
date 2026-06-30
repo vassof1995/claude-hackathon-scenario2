@@ -35,21 +35,30 @@ their **quality** to prompts and review. Concretely, an escalation ladder:
 3. **The easy path:** the `/adr` skill scaffolds the next-numbered ADR and pre-fills it
    from the diff, so satisfying the gate costs seconds, not friction.
 
-For **CLAUDE.md maintenance** we split the file by trust:
-- **Facts** (service list, module list, the local↔cloud mapping table) are *generated* from
-  the repo by the `/sync-claude-md` skill — they must match reality, so a machine derives them.
-- **Conventions** (opinions, guidance, "prefer X") stay *hand-curated* — they encode judgment
-  a generator cannot supply. A `SessionStart` hook surfaces staleness (code newer than the
-  CLAUDE.md that documents it) but never rewrites opinions.
+For **CLAUDE.md maintenance** we keep every file hand-written and let a hook keep it honest —
+we do **not** generate or auto-create CLAUDE.md content:
+- A **`Stop` hook** (`scripts/claude_md_currency.py`) checks, when a turn ends, whether code
+  under a directory-scoped CLAUDE.md changed in the working tree without that CLAUDE.md being
+  revised. If so, it asks Claude to review the existing file and revise it where the guidance
+  is now stale — or to confirm explicitly that no change is needed. It fires at most once per
+  session and never edits the file itself; the revision is Claude's judgment, not a template.
+- The **revision is always judgment-based.** A machine can detect *that* guidance may be
+  stale (deterministic: code touched, doc untouched); it cannot write *correct* guidance.
+  So the check is mechanical and the rewrite stays with the model + review.
+- The **root CLAUDE.md is exempt** from this check: it holds team conventions, not code-tracked
+  facts, so directory churn should not force a rewrite of it.
 
 ## Consequences
 - Architectural changes cannot land silently undocumented; the decision trail the CTO reads
   stays complete, and the commit history (which is judged) shows the reasoning.
 - The gate enforces presence, not quality — a lazy ADR still passes. Quality is caught by
   human/Claude review and the `CLAUDE.md` prompt, exactly where judgment lives.
-- `core.hooksPath` is local config, so each clone runs `scripts/setup.sh` once. The
-  `PostToolUse` Claude hook needs no setup (it ships in committed `.claude/settings.json`).
-- `CLAUDE.md` factual drift is mechanically fixable; only the opinionated parts need a human.
+- `core.hooksPath` is local config, so each clone runs `scripts/setup.sh` once. The Claude
+  hooks (`PostToolUse` ADR nudge, `Stop` CLAUDE.md currency) need no setup — they ship in
+  committed `.claude/settings.json`.
+- CLAUDE.md never drifts silently: a code change under a scoped file forces a conscious
+  review. But because nothing is generated, the file stays fully human-authored — the check
+  prompts a person/model, it does not write guidance.
 - This same pattern (gate presence, prompt quality) generalises to the Scorecard
   (Challenge 7), which scores how often Claude proposes something a gate would block.
 
@@ -59,8 +68,10 @@ For **CLAUDE.md maintenance** we split the file by trust:
 - **Hard pre-commit requiring a *new* ADR file on every architectural commit** — rejected;
   too strict (many commits implement one decision), so it trains people to `--no-verify`.
   Referencing an existing `ADR-NNNN` is the lower-friction, equally-deterministic rule.
-- **Fully auto-generating CLAUDE.md** — rejected; a generator can derive facts but not
-  judgment, and overwriting curated guidance would destroy the file's main value.
+- **Auto-generating CLAUDE.md content (managed/generated blocks)** — rejected; a generator can
+  derive facts but not judgment, generated blocks fragment a file meant to read as one voice,
+  and the value of CLAUDE.md is precisely the curated guidance a generator cannot supply. We
+  enforce *currency* (a hook prompts review) without generating *content*.
 - **A CI-only gate (no local hook)** — deferred, not rejected: a GitHub Action that fails a
   PR touching `infra/` without `decisions/` changes is the natural Layer-3 backstop against
   local bypass, and pairs with the non-interactive Scorecard review.
