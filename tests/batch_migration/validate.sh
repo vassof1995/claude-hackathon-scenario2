@@ -51,14 +51,23 @@ expect_denied() { # role password "SQL" label
 }
 
 # --- Bring up the stand-in -----------------------------------------------------------------
-# --wait blocks until EVERY service is healthy (postgres, web-api AND batch). batch owns the
-# reporting schema via Flyway and exposes /run, so we must wait for it, not just web-api.
-info "Bringing up the legacy stand-in (docker compose up --build -d --wait)…"
-if ! ( cd "$LEGACY" && docker compose up --build -d --wait --wait-timeout 240 ); then
-  echo "stand-in did not become healthy — diagnostics:"
-  ( cd "$LEGACY" && docker compose ps && echo "--- logs ---" && docker compose logs --tail=60 )
-  exit 2
-fi
+# Only the services this test needs: postgres -> web-api (owns app schema + seed) -> batch
+# (owns reporting schema, serves /run). compose starts the depends_on chain in order. We skip
+# the frontend entirely. Readiness is polled against the real HTTP health endpoints from the
+# host, so it doesn't depend on in-container healthcheck tooling or a fixed compose timeout.
+dump() { ( cd "$LEGACY" && docker compose ps && echo "--- logs ---" && docker compose logs --tail=80 "$@" ); }
+
+info "Bringing up the legacy stand-in (postgres + web-api + batch)…"
+( cd "$LEGACY" && docker compose up --build -d postgres web-api batch ) \
+  || { echo "compose up failed (is the docker daemon running?)"; dump; exit 2; }
+
+wait_http() { # url
+  for _ in $(seq 1 80); do curl -fsS "$1" >/dev/null 2>&1 && return 0; sleep 3; done; return 1
+}
+info "Waiting for web-api (:8081) and batch (:8082) health endpoints…"
+wait_http "http://localhost:8081/actuator/health" || { echo "web-api never became ready"; dump web-api; exit 2; }
+wait_http "http://localhost:8082/actuator/health" || { echo "batch never became ready"; dump batch; exit 2; }
+ok "web-api and batch are up (app schema seeded, reporting schema migrated)"
 
 # --- Trigger one reconciliation (the EventBridge run-to-exit stand-in) ----------------------
 info "Triggering reconciliation for $BIZDATE via POST /run…"
